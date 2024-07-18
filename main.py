@@ -199,7 +199,18 @@ def main(args: DictConfig):
             total_loss += loss.item()
         print(f"Epoch {epoch+1}, Loss: {total_loss / len(train_data)}")
 
-        # test
+        # Create the directory if it doesn't exist
+        if not os.path.exists("checkpoints"):
+            os.makedirs("checkpoints")
+
+        model_path = f"checkpoints/model_{current_time}_epoch_{epoch+1}.pth"
+        torch.save(model.state_dict(), model_path)
+        print(f"Model saved to {model_path}")
+
+        # ------------------
+        #   Start predicting
+        # ------------------
+        model.load_state_dict(torch.load(model_path, map_location=device))
         model.eval()
         flow: torch.Tensor = torch.tensor([]).to(device)
 
@@ -208,7 +219,8 @@ def main(args: DictConfig):
             for batch in tqdm(test_data):
                 batch: Dict[str, Any]
                 event_image = batch["event_volume"].to(device)
-                batch_flow = model(event_image)
+                batch_flow_dict = model(event_image)
+                batch_flow = batch_flow_dict["flow3"]  # [B, 2, 480, 640]
                 flow = torch.cat((flow, batch_flow), dim=0)
             print("test done")
         file_name = f"submission_{current_time}_epoch_{epoch+1}"
@@ -227,33 +239,33 @@ def main(args: DictConfig):
         #     model.train()
         #     print(f"Validation Loss: {total_loss / len(valid_data)}")
 
-    # Create the directory if it doesn't exist
-    if not os.path.exists("checkpoints"):
-        os.makedirs("checkpoints")
+    # # Create the directory if it doesn't exist
+    # if not os.path.exists("checkpoints"):
+    #     os.makedirs("checkpoints")
 
-    model_path = f"checkpoints/model_{current_time}.pth"
-    torch.save(model.state_dict(), model_path)
-    print(f"Model saved to {model_path}")
+    # model_path = f"checkpoints/model_{current_time}.pth"
+    # torch.save(model.state_dict(), model_path)
+    # print(f"Model saved to {model_path}")
 
     # ------------------
     #   Start predicting
     # ------------------
-    model.load_state_dict(torch.load(model_path, map_location=device))
-    model.eval()
-    flow: torch.Tensor = torch.tensor([]).to(device)
-    with torch.no_grad():
-        print("start test")
-        for batch in tqdm(test_data):
-            batch: Dict[str, Any]
-            event_image = batch["event_volume"].to(device)
-            batch_flow = model(event_image)  # [1, 2, 480, 640]
-            flow = torch.cat((flow, batch_flow), dim=0)  # [N, 2, 480, 640]
-        print("test done")
-    # ------------------
-    #  save submission
-    # ------------------
-    file_name = "submission"
-    save_optical_flow_to_npy(flow, file_name)
+    # model.load_state_dict(torch.load(model_path, map_location=device))
+    # model.eval()
+    # flow: torch.Tensor = torch.tensor([]).to(device)
+    # with torch.no_grad():
+    #     print("start test")
+    #     for batch in tqdm(test_data):
+    #         batch: Dict[str, Any]
+    #         event_image = batch["event_volume"].to(device)
+    #         batch_flow = model(event_image)  # [1, 2, 480, 640]
+    #         flow = torch.cat((flow, batch_flow), dim=0)  # [N, 2, 480, 640]
+    #     print("test done")
+    # # ------------------
+    # #  save submission
+    # # ------------------
+    # file_name = "submission"
+    # save_optical_flow_to_npy(flow, file_name)
 
 
 if __name__ == "__main__":
